@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
 import { LocationSearchBox } from './components/LocationSearchBox';
 
 export default function Home() {
@@ -11,23 +12,18 @@ export default function Home() {
     lon: string;
   } | null>(null);
   const [jobTitle, setJobTitle] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [yearsOfExperience, setYearsOfExperience] = useState<number | null>(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    if (jobTitle.length > 2) {
-      // Fetch job title suggestions from an API
-      axios
-        .get(`/api/job-titles?query=${jobTitle}`)
-        .then((response) => {
-          setSuggestions(response.data || []);
-        })
-        .catch((error) => {
-          console.error('Error fetching job title suggestions:', error);
-        });
-    } else {
-      setSuggestions([]);
-    }
-  }, [jobTitle]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Navigate to the results page with query parameters
+    router.push(
+      `/results?jobTitle=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(
+        selectedLocation?.name || ''
+      )}&yearsOfExperience=${encodeURIComponent(yearsOfExperience || '')}`
+    );
+  };
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -35,32 +31,19 @@ export default function Home() {
         <h1 className="text-2xl font-bold text-center sm:text-left">
           Find Your Salary Range
         </h1>
-        <form className="flex flex-col gap-4 w-full max-w-md">
+        <form className="flex flex-col gap-4 w-full max-w-md" onSubmit={handleSubmit}>
           <label className="flex flex-col">
             <span className="font-medium">Job Title</span>
             <input
               type="text"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
               placeholder="e.g., Software Engineer"
               className="border border-gray-300 rounded px-3 py-2"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
             />
-            {suggestions.length > 0 && (
-              <ul className="border border-gray-300 rounded mt-2 bg-white max-h-40 overflow-y-auto">
-                {suggestions.map((suggestion, index) => (
-                  <li
-                    key={index}
-                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => setJobTitle(suggestion)}
-                  >
-                    {suggestion}
-                  </li>
-                ))}
-              </ul>
-            )}
           </label>
           <label className="flex flex-col">
-            <h1 className="text-2xl font-semibold mb-6">Search for a Location</h1>
+            <span className="font-medium">Location</span>
             <LocationSearchBox
               onSelect={(loc) =>
                 setSelectedLocation({
@@ -78,6 +61,8 @@ export default function Home() {
               placeholder="e.g., 5"
               className="border border-gray-300 rounded px-3 py-2"
               min="0"
+              value={yearsOfExperience || ''}
+              onChange={(e) => setYearsOfExperience(Number(e.target.value))}
             />
           </label>
           <button
