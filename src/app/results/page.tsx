@@ -22,6 +22,11 @@ export default function Results() {
     }
   });
 
+  const [minSalary, setMinSalary] = useState<string | null>(null);
+  const [maxSalary, setMaxSalary] = useState<string | null>(null);
+  const [salaryCurrency, setSalaryCurrency] = useState<string | null>(null);
+  const [jobResults, setJobResults] = useState<string | null>(null);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -38,24 +43,30 @@ export default function Results() {
       )}&years_of_experience=${encodeURIComponent(sanitizedYearsOfExperience)}`;
 
       try {
-        const response = await axios.get(endpoint);
+        interface SalaryResponse {
+          median_salary: string;
+          min_salary: string;
+          max_salary: string;
+          salary_currency: string;
+        }
+
+        const response = await axios.get<SalaryResponse>(endpoint);
         console.log('API Response:', response.data); // Log the API response for debugging
 
         // Check if the response data is empty
-        if (!response.data || response.data === '') {
+        if (!response.data) {
           setError('No salary data available for the given parameters.');
           setSalaryData(null);
         } else {
-          setSalaryData(JSON.stringify(response.data)); // Convert response data to string
+          const salaryResponse = response.data; // Use the response data directly
+          setSalaryData(salaryResponse.median_salary || 'N/A'); // Set median salary
+          setMinSalary(salaryResponse.min_salary || 'N/A'); // Set minimum salary
+          setMaxSalary(salaryResponse.max_salary || 'N/A'); // Set maximum salary
+          setSalaryCurrency(salaryResponse.salary_currency || 'N/A'); // Set salary currency
           setError(null);
         }
       } catch (err: any) {
         console.error('API Error:', err); // Log the full error for debugging
-        if (err.response) {
-          console.error('Error Response Data:', err.response.data); // Log error response data
-          console.error('Error Response Status:', err.response.status); // Log error status
-          console.error('Error Response Headers:', err.response.headers); // Log error headers
-        }
         setError(
           err.response?.data?.message ||
             `Failed to fetch salary data. Status: ${err.response?.status || 'Unknown'}`
@@ -67,11 +78,64 @@ export default function Results() {
     fetchSalaryData();
   }, [jobTitle, location, yearsOfExperience]);
 
+  const fetchJobResults = async () => {
+    const query = `${jobTitle} in ${location}`;
+    interface JobResultsResponse {
+      jobs: string;
+    }
+
+    try {
+      const response = await axios.get<JobResultsResponse>(`http://127.0.0.1:5002/jobs?query=${encodeURIComponent(query)}`);
+      setJobResults(response.data.jobs || 'No jobs found.');
+    } catch (err) {
+      console.error('Error fetching job results:', err);
+      setJobResults('Failed to fetch job results.');
+    }
+  };
+
   const capitalize = (text: string) => {
     return text
       .split(' ')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
+  };
+
+  const formatSalary = (salary: string | null) => {
+    if (!salary || salary === 'N/A') return 'N/A';
+    const roundedSalary = parseFloat(salary).toFixed(2); // Round to 2 decimal places
+    return roundedSalary.replace(/\B(?=(\d{3})+(?!\d))/g, ','); // Add commas
+  };
+
+  const currencySymbols: { [key: string]: string } = {
+    USD: '$',
+    EUR: '€',
+    GBP: '£',
+    INR: '₹',
+    JPY: '¥',
+    AUD: 'A$',
+    CAD: 'C$',
+    CHF: 'CHF',
+    CNY: '¥',
+    SEK: 'kr',
+    NZD: 'NZ$',
+    SGD: 'S$',
+    HKD: 'HK$',
+    KRW: '₩',
+    ZAR: 'R',
+    BRL: 'R$',
+    MXN: 'MX$',
+    RUB: '₽',
+    AED: 'د.إ',
+    SAR: '﷼',
+    // Add more currencies as needed
+  };
+
+  const formatSalaryWithCurrency = (salary: string | null, currency: string | null) => {
+    if (!salary || salary === 'N/A') return 'N/A';
+    const roundedSalary = parseFloat(salary).toFixed(2); // Round to 2 decimal places
+    const formattedSalary = roundedSalary.replace(/\B(?=(\d{3})+(?!\d))/g, ','); // Add commas
+    const symbol = currencySymbols[currency || ''] || currency || ''; // Get the currency symbol or fallback to currency code
+    return `${symbol}${formattedSalary}`;
   };
 
   return (
@@ -92,10 +156,17 @@ export default function Results() {
             <strong>Error:</strong> {error}
           </p>
         ) : (
-          <p className="mt-4">
-            <strong>Estimated Salary:</strong>{' '}
-            {salaryData ? salaryData : 'Loading...'}
-          </p>
+          <div className="mt-4">
+            <p>
+              <strong>Median Salary:</strong> {formatSalaryWithCurrency(salaryData, salaryCurrency)}
+            </p>
+            <p>
+              <strong>Minimum Salary:</strong> {formatSalaryWithCurrency(minSalary, salaryCurrency)}
+            </p>
+            <p>
+              <strong>Maximum Salary:</strong> {formatSalaryWithCurrency(maxSalary, salaryCurrency)}
+            </p>
+          </div>
         )}
         <div className="mt-4">
           <strong>Suggested Job Titles:</strong>
@@ -110,11 +181,27 @@ export default function Results() {
           )}
         </div>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => {
+            const medianSalary = salaryData || '';
+            localStorage.setItem('medianSalary', medianSalary); // Store median salary in localStorage
+            router.push('/'); // Navigate back to the home page
+          }}
           className="mt-6 rounded-full bg-blue-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
         >
           Go Back to Home
         </button>
+        <button
+          onClick={fetchJobResults}
+          className="mt-4 rounded-full bg-green-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-green-700"
+        >
+          Fetch Job Results
+        </button>
+        {jobResults && (
+          <div className="mt-4 bg-gray-100 p-4 rounded shadow-md w-full max-w-md">
+            <h2 className="text-lg font-bold mb-2">Job Results:</h2>
+            <pre className="text-sm whitespace-pre-wrap">{jobResults}</pre>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { LocationSearchBox } from './components/LocationSearchBox';
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const medianSalary = searchParams.get('medianSalary') || ''; // Get median salary from query params
   const [selectedLocation, setSelectedLocation] = useState<{
     name: string;
     lat: string;
@@ -16,7 +18,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [recentSearches, setRecentSearches] = useState<
-    { jobTitle: string; location: string }[]
+    { jobTitle: string; location: string; lat: string; lon: string; medianSalary: string }[]
   >([]);
 
   // Load saved resume and recent searches on the client
@@ -37,11 +39,22 @@ export default function Home() {
     if (savedSearches) {
       setRecentSearches(JSON.parse(savedSearches));
     }
+
+    const storedMedianSalary = localStorage.getItem('medianSalary'); // Retrieve median salary
+    if (storedMedianSalary) {
+      localStorage.removeItem('medianSalary'); // Clear it after retrieval
+    }
   }, []);
 
   const saveSearch = (jobTitle: string, location: string) => {
-    const newSearch = { jobTitle, location };
-    const updatedSearches = [newSearch, ...recentSearches].slice(0, 5); // Keep only the last 5 searches
+    const newSearch = {
+      jobTitle,
+      location,
+      lat: selectedLocation?.lat || '',
+      lon: selectedLocation?.lon || '',
+      medianSalary: medianSalary || '',
+    };
+    const updatedSearches = [newSearch, ...recentSearches].slice(0, 5);
     setRecentSearches(updatedSearches);
     localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
   };
@@ -137,6 +150,11 @@ export default function Home() {
       .join(' ');
   };
 
+  const handleSignOut = () => {
+    localStorage.removeItem('user'); // Clear user data
+    router.push('/login'); // Redirect to login page
+  };
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
@@ -174,11 +192,6 @@ export default function Home() {
               className="border border-gray-300 rounded px-3 py-2"
               onChange={handleFileChange}
             />
-            {resume && (
-              <p className="text-sm text-gray-600 mt-2">
-                Selected File: <strong>{resume.name}</strong>
-              </p>
-            )}
           </label>
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
@@ -193,9 +206,20 @@ export default function Home() {
           {recentSearches.length > 0 ? (
             <ul className="list-disc list-inside">
               {recentSearches.map((search, index) => (
-                <li key={index}>
+                <li
+                  key={index}
+                  className="cursor-pointer text-blue-600 hover:underline"
+                  onClick={() => {
+                    setJobTitle(capitalize(search.jobTitle)); // Capitalize job title when setting it
+                    setSelectedLocation({
+                      name: search.location,
+                      lat: search.lat,
+                      lon: search.lon,
+                    });
+                  }}
+                >
                   <strong>Job Title:</strong> {capitalize(search.jobTitle)}, <strong>Location:</strong>{' '}
-                  {search.location}
+                  {search.location}, <strong>Median Salary:</strong> {search.medianSalary || 'N/A'}
                 </li>
               ))}
             </ul>
@@ -203,6 +227,12 @@ export default function Home() {
             <p>No recent searches.</p>
           )}
         </div>
+        <button
+          onClick={handleSignOut}
+          className="mt-6 rounded-full bg-red-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-red-700"
+        >
+          Sign Out
+        </button>
       </main>
     </div>
   );

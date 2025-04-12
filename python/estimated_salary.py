@@ -56,7 +56,15 @@ def get_estimated_salary():
         if parsed_data.get("status") == "OK" and "data" in parsed_data:
             salary_data = parsed_data["data"][0]  # Extract the first result
             median_salary = salary_data.get("median_salary", "N/A")  # Get the median salary
-            return str(median_salary)  # Return the median salary as a plain string
+            min_salary = salary_data.get("min_salary", "N/A")  # Get the minimum salary
+            max_salary = salary_data.get("max_salary", "N/A")  # Get the maximum salary
+            salary_currency = salary_data.get("salary_currency", "N/A")  # Get the salary currency
+            return json.dumps({
+                "median_salary": median_salary,
+                "min_salary": min_salary,
+                "max_salary": max_salary,
+                "salary_currency": salary_currency
+            })  # Return all salary data as JSON
         else:
             return "Error: Failed to retrieve salary data"
     except json.JSONDecodeError:
