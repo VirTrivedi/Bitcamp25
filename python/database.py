@@ -19,10 +19,11 @@ class User:
         self.recentSearchList = deque(maxlen=5)
 
 class RecentSearch:
-    def __init__(self, jobTitle: str, location: str, med_salary: int):
+    def __init__(self, jobTitle: str, location: str, med_salary: str, url: str = None):
         self.jobTitle = jobTitle
         self.location = location
         self.med_salary = med_salary
+        self.url = url
 
 def add_to_recent_search(user_id: int, RS: RecentSearch):
     user = collection.find_one({"_id": user_id})
@@ -140,6 +141,42 @@ def get_recent_searches(user_id):
             recent_searches.append(rs)
 
     return jsonify(recent_searches)
+
+@app.route("/users/<int:user_id>/recent/med_salary", methods=["PUT"])
+def update_recent_search_med_salary(user_id):
+    data = request.json
+    if "med_salary" not in data:
+        return jsonify({"error": "Missing med_salary"}), 400
+
+    user = collection.find_one({"_id": user_id})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Update the med_salary of the most recent search (rs1)
+    if user.get("rs1"):
+        user["rs1"]["med_salary"] = data["med_salary"]
+        collection.update_one({"_id": user_id}, {"$set": {"rs1": user["rs1"]}})
+        return jsonify({"message": "Recent search med_salary updated", "recent_search": user["rs1"]})
+
+    return jsonify({"error": "No recent searches found"}), 404
+
+@app.route("/users/<int:user_id>/recent/url", methods=["PUT"])
+def update_recent_search_url(user_id):
+    data = request.json
+    if "url" not in data:
+        return jsonify({"error": "Missing url"}), 400
+
+    user = collection.find_one({"_id": user_id})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Update the url of the most recent search (rs1)
+    if user.get("rs1"):
+        user["rs1"]["url"] = data["url"]
+        collection.update_one({"_id": user_id}, {"$set": {"rs1": user["rs1"]}})
+        return jsonify({"message": "Recent search url updated", "recent_search": user["rs1"]})
+
+    return jsonify({"error": "No recent searches found"}), 404
 
 if __name__ == "__main__":
     app.run(debug=True, port=5003)

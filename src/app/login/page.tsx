@@ -2,19 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
   const router = useRouter();
 
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      router.push('/'); // Redirect to home if already logged in
+    const userCookie = Cookies.get('user');
+    if (userCookie) {
+      try {
+        const parsedUser = JSON.parse(userCookie);
+        if (parsedUser && parsedUser.id) {
+          router.push('/'); // Redirect to home if valid user exists
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse user from cookies:', err);
+      }
     }
-  }, []);
+    setIsLoading(false); // Set loading to false if no valid user
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +41,7 @@ export default function Login() {
         const storedPassword = await passwordResponse.text();
 
         if (username === email && storedPassword === password) {
-          localStorage.setItem('user', JSON.stringify({ email: username }));
+          Cookies.set('user', JSON.stringify({ id: userId, username }));
           router.push('/');
         } else {
           setError('Invalid email or password.');
@@ -54,6 +65,10 @@ export default function Login() {
     return Math.abs(hash); // Ensure positive value
   }
   
+  if (isLoading) {
+    return <div>Loading...</div>; // Show a loading indicator while validating
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
       <h1 className="text-2xl font-bold mb-4">Login</h1>

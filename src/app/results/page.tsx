@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 
 export default function Results() {
   const searchParams = useSearchParams();
@@ -163,6 +164,77 @@ export default function Results() {
     return `${symbol}${formattedSalary}`;
   };
 
+  const updateMedianSalaryInDatabase = async (medianSalary: string) => {
+    const userCookie = Cookies.get('user');
+    if (!userCookie) {
+      console.error('User not logged in');
+      return;
+    }
+
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(userCookie);
+    } catch (err) {
+      console.error('Failed to parse user from cookies:', err);
+      return;
+    }
+
+    if (!parsedUser || !parsedUser.id) {
+      console.error('Invalid user object:', parsedUser);
+      return;
+    }
+
+    try {
+      const formattedSalary = formatSalaryWithCurrency(medianSalary, salaryCurrency); // Format the median salary
+      const response = await axios.put(
+        `http://127.0.0.1:5003/users/${parsedUser.id}/recent/med_salary`,
+        { med_salary: formattedSalary } // Use the formatted salary
+      );
+      console.log('Median salary updated in database:', response.data);
+    } catch (err) {
+      console.error('Error updating median salary in database:', err);
+    }
+  };
+
+  const updateUrlInDatabase = async (url: string) => {
+    const userCookie = Cookies.get('user');
+    if (!userCookie) {
+      console.error('User not logged in');
+      return;
+    }
+
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(userCookie);
+    } catch (err) {
+      console.error('Failed to parse user from cookies:', err);
+      return;
+    }
+
+    if (!parsedUser || !parsedUser.id) {
+      console.error('Invalid user object:', parsedUser);
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://127.0.0.1:5003/users/${parsedUser.id}/recent/url`,
+        { url }
+      );
+      console.log('URL updated in database:', response.data);
+    } catch (err) {
+      console.error('Error updating URL in database:', err);
+    }
+  };
+
+  const handleGoBack = () => {
+    const medianSalary = salaryData || '';
+    const currentUrl = window.location.href; // Get the current website's URL
+    updateMedianSalaryInDatabase(medianSalary); // Update the database with the median salary
+    updateUrlInDatabase(currentUrl); // Update the database with the current URL
+    router.push('/'); // Navigate back to the home page
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Salary Range Results</h1>
@@ -206,11 +278,7 @@ export default function Results() {
           )}
         </div>
         <button
-          onClick={() => {
-            const medianSalary = salaryData || '';
-            localStorage.setItem('medianSalary', medianSalary); // Store median salary in localStorage
-            router.push('/'); // Navigate back to the home page
-          }}
+          onClick={handleGoBack}
           className="mt-6 rounded-full bg-blue-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
         >
           Go Back to Home

@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LocationSearchBox } from './components/LocationSearchBox';
+import Cookies from 'js-cookie';
 
 export default function Home() {
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
   const searchParams = useSearchParams();
   const medianSalary = searchParams.get('medianSalary') || ''; // Get median salary from query params
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -18,18 +20,33 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [recentSearches, setRecentSearches] = useState<
-    { jobTitle: string; location: string; lat: string; lon: string; medianSalary: string }[]
+    { jobTitle: string; location: string; lat: string; lon: string; medianSalary: string; url: string }[]
   >([]);
 
   // Load saved resume and recent searches on the client
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (!user) {
+    const userCookie = Cookies.get('user');
+    if (!userCookie) {
       router.push('/login');
       return;
     }
 
-    const savedResume = localStorage.getItem('savedResume');
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(userCookie);
+    } catch (err) {
+      console.error('Failed to parse user from cookies:', err);
+      router.push('/login');
+      return;
+    }
+
+    if (!parsedUser || !parsedUser.id) {
+      console.error('Invalid user object:', parsedUser);
+      router.push('/login');
+      return;
+    }
+
+    const savedResume = Cookies.get('savedResume');
     if (savedResume) {
       const byteString = atob(savedResume.split(',')[1]);
       const mimeString = savedResume.split(',')[0].split(':')[1].split(';')[0];
@@ -41,35 +58,77 @@ export default function Home() {
       setResume(new File([arrayBuffer], 'resume.pdf', { type: mimeString }));
     }
 
-    const savedSearches = localStorage.getItem('recentSearches');
-    if (savedSearches) {
-      setRecentSearches(JSON.parse(savedSearches));
+    const fetchRecentSearches = async () => {
+      try {
+        const response = await axios.get(
+          `http://127.0.0.1:5003/users/${parsedUser.id}/recent`
+        );
+        console.log('Fetched recent searches:', response.data);
+        setRecentSearches(
+          (response.data as { jobTitle: string; location: string; med_salary: string; url: string }[]).map((search) => ({
+            jobTitle: search.jobTitle,
+            location: search.location,
+            lat: '', // Placeholder as lat/lon are not stored in the database
+            lon: '',
+            medianSalary: search.med_salary,
+            url: search.url || '', // Include the URL field
+          }))
+        );
+      } catch (err) {
+        console.error('Error fetching recent searches:', err);
+      }
+    };
+
+    fetchRecentSearches();
+
+    const storedMedianSalary = Cookies.get('medianSalary'); // Retrieve median salary
+    if (storedMedianSalary) {
+      Cookies.remove('medianSalary'); // Clear it after retrieval
     }
 
-    const storedMedianSalary = localStorage.getItem('medianSalary'); // Retrieve median salary
-    if (storedMedianSalary) {
-      localStorage.removeItem('medianSalary'); // Clear it after retrieval
-    }
+    setIsLoading(false); // Set loading to false after validation
   }, [router]);
 
-  const saveSearch = (jobTitle: string, location: string) => {
+  const saveSearch = async (jobTitle: string, location: string) => {
+    const user = JSON.parse(Cookies.get('user') || '{}');
+    if (!user || !user.id) {
+      console.error('User not logged in');
+      return;
+    }
+
     const newSearch = {
       jobTitle,
       location,
-      lat: selectedLocation?.lat || '',
-      lon: selectedLocation?.lon || '',
-      medianSalary: medianSalary || '',
+      med_salary: medianSalary || '', // Use `med_salary` to match the database structure
     };
-    const updatedSearches = [newSearch, ...recentSearches].slice(0, 5);
-    setRecentSearches(updatedSearches);
-    localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
+
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:5003/users/${user.id}/recent`,
+        newSearch
+      );
+      console.log('Recent search updated:', response.data);
+      const responseData = response.data as { recent_searches: { jobTitle: string; location: string; med_salary: string }[] };
+      setRecentSearches(
+        responseData.recent_searches.map((search) => ({
+          jobTitle: search.jobTitle,
+          location: search.location,
+          lat: '', // Default value for lat
+          lon: '', // Default value for lon
+          medianSalary: search.med_salary,
+          url: '', // Default value for url
+        }))
+      );
+    } catch (err) {
+      console.error('Error updating recent searches:', err);
+    }
   };
 
   const saveResume = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       if (reader.result) {
-        localStorage.setItem('savedResume', reader.result as string);
+        Cookies.set('savedResume', reader.result as string);
       }
     };
     reader.readAsDataURL(file);
@@ -157,9 +216,13 @@ export default function Home() {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem('user'); // Clear user data
+    Cookies.remove('user'); // Clear user data
     router.push('/login'); // Redirect to login page
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Show a loading indicator while validating
+  }
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -216,12 +279,16 @@ export default function Home() {
                   key={index}
                   className="cursor-pointer text-blue-600 hover:underline"
                   onClick={() => {
-                    setJobTitle(capitalize(search.jobTitle)); // Capitalize job title when setting it
-                    setSelectedLocation({
-                      name: search.location,
-                      lat: search.lat,
-                      lon: search.lon,
-                    });
+                    if (search.url) {
+                      window.location.href = search.url; // Navigate to the stored URL
+                    } else {
+                      setJobTitle(capitalize(search.jobTitle)); // Fallback: Set job title
+                      setSelectedLocation({
+                        name: search.location,
+                        lat: search.lat,
+                        lon: search.lon,
+                      });
+                    }
                   }}
                 >
                   <strong>Job Title:</strong> {capitalize(search.jobTitle)}, <strong>Location:</strong>{' '}

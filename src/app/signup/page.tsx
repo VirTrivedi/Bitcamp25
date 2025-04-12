@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 
 export default function Signup() {
   const [email, setEmail] = useState('');
@@ -46,7 +47,7 @@ export default function Signup() {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('user', JSON.stringify({ name: data.user.username }));
+        Cookies.set('user', JSON.stringify({ id: data.user.id, username: data.user.username }));
         router.push('/login');
       } else {
         const errorData = await response.json();
