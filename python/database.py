@@ -76,4 +76,13 @@ def delete_all_users():
     return jsonify({"message": "All users deleted"})
 
 if __name__ == "__main__":
+    collection.delete_many({})  
+    collection.insert_one({
+        "_id": 10,
+        "username": "isharko",
+        "password": "abg"
+    })
+    #collection.find_one({"_id": -2084459435})
+    for user in collection.find({}):
+        print(user.get("username"))
     app.run(debug=True)
