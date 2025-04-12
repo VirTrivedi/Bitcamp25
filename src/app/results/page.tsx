@@ -78,21 +78,45 @@ export default function Results() {
     fetchSalaryData();
   }, [jobTitle, location, yearsOfExperience]);
 
+  interface Job {
+    job_id: string;
+    job_title: string;
+    employer_name?: string;
+    employer_logo?: string;
+    employer_website?: string;
+    job_publisher?: string;
+    job_employment_type?: string;
+    job_apply_link?: string;
+    job_description?: string;
+    job_location?: string;
+    job_city?: string;
+    job_country?: string;
+    job_min_salary?: string;
+    job_max_salary?: string;
+    salary_currency?: string;
+    job_posted_at?: string;
+    job_google_link?: string;
+  }
+
   const fetchJobResults = async () => {
     const query = `${jobTitle} in ${location}`;
     interface JobResultsResponse {
-      jobs: string;
+      jobs: string; // Stringified JSON containing job data
     }
 
     try {
       const response = await axios.get<JobResultsResponse>(`http://127.0.0.1:5002/jobs?query=${encodeURIComponent(query)}`);
-      setJobResults(response.data.jobs || 'No jobs found.');
+      console.log('Job Results Response:', response.data); // Log the response data
+
+      // Parse the stringified `jobs` field to extract the `data` array
+      const parsedJobs: Job[] = JSON.parse(response.data.jobs).data;
+      setJobResults(JSON.stringify(parsedJobs)); // Store the parsed `data` array as a JSON string
     } catch (err) {
       console.error('Error fetching job results:', err);
-      setJobResults('Failed to fetch job results.');
+      setJobResults('[]'); // Set to an empty array as a JSON string
     }
   };
-
+  
   const capitalize = (text: string) => {
     return text
       .split(' ')
@@ -131,7 +155,8 @@ export default function Results() {
   };
 
   const formatSalaryWithCurrency = (salary: string | null, currency: string | null) => {
-    if (!salary || salary === 'N/A') return 'N/A';
+    if (salary === null) return 'Loading...'; // Show "Loading..." while salary is null
+    if (salary === 'N/A') return 'N/A';
     const roundedSalary = parseFloat(salary).toFixed(2); // Round to 2 decimal places
     const formattedSalary = roundedSalary.replace(/\B(?=(\d{3})+(?!\d))/g, ','); // Add commas
     const symbol = currencySymbols[currency || ''] || currency || ''; // Get the currency symbol or fallback to currency code
@@ -139,9 +164,9 @@ export default function Results() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8">
+    <div className="min-h-screen flex flex-col items-center justify-center p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Salary Range Results</h1>
-      <div className="bg-black shadow-md rounded p-6 max-w-md w-full">
+      <div className="bg-black shadow-md rounded p-6 w-full">
         <p className="mb-2">
           <strong>Job Title:</strong> {jobTitle || 'N/A'}
         </p>
@@ -197,9 +222,35 @@ export default function Results() {
           Fetch Job Results
         </button>
         {jobResults && (
-          <div className="mt-4 bg-gray-100 p-4 rounded shadow-md w-full max-w-md">
-            <h2 className="text-lg font-bold mb-2">Job Results:</h2>
-            <pre className="text-sm whitespace-pre-wrap">{jobResults}</pre>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(() => {
+              try {
+                const jobs: Job[] = JSON.parse(jobResults); // Parse the `jobResults` JSON string
+                if (Array.isArray(jobs) && jobs.length > 0) {
+                  return jobs.map((job, index) => (
+                    <div
+                      key={index}
+                      className="text-white shadow-md rounded p-4 flex flex-col justify-between h-64 w-64 border border-white"
+                    >
+                      <p><strong>Job Title:</strong> {job.job_title || 'N/A'}</p>
+                      <p><strong>Employer:</strong> {job.employer_name || 'N/A'}</p>
+                      <p><strong>Location:</strong> {job.job_location || 'N/A'}</p>
+                      <p><strong>Posted:</strong> {job.job_posted_at || 'N/A'}</p>
+                      <p><strong>Job Link:</strong> {job.job_google_link ? (
+                        <a href={job.job_google_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          View Job
+                        </a>
+                      ) : 'N/A'}</p>
+                    </div>
+                  ));
+                } else {
+                  return <p>No job results found.</p>;
+                }
+              } catch (err) {
+                console.error('Error parsing job results:', err);
+                return <p>Failed to parse job results.</p>;
+              }
+            })()}
           </div>
         )}
       </div>

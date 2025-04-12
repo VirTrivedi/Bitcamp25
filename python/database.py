@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
 
 app = Flask(__name__)
+CORS(app)
 
 cluster = MongoClient("mongodb+srv://sidk4156:wd8lTyefzJgty3Nb@cluster0.ol8pdzi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = cluster["jobs"]
@@ -21,12 +23,14 @@ def get_username(user_id):
     user = collection.find_one({"_id": user_id})
     if user:
         return user["username"]
+    return jsonify({"error": "User not found"}), 404
 
-@app.route("/users/<int:user_id>/password", methods=["GET"])   
+@app.route("/users/<int:user_id>/password", methods=["GET"])
 def get_password(user_id):
     user = collection.find_one({"_id": user_id})
     if user:
         return user["password"]
+    return jsonify({"error": "User not found"}), 404
     
 @app.route("/users/", methods=["POST"])
 def create_user():
@@ -76,13 +80,4 @@ def delete_all_users():
     return jsonify({"message": "All users deleted"})
 
 if __name__ == "__main__":
-    collection.delete_many({})  
-    collection.insert_one({
-        "_id": 10,
-        "username": "isharko",
-        "password": "abg"
-    })
-    #collection.find_one({"_id": -2084459435})
-    for user in collection.find({}):
-        print(user.get("username"))
-    app.run(debug=True)
+    app.run(debug=True, port=5003)
