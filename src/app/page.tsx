@@ -134,11 +134,30 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
+  const saveResumePath = async (filePath: string) => {
+    const user = JSON.parse(Cookies.get('user') || '{}');
+    if (!user || !user.id) {
+      console.error('User not logged in');
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://127.0.0.1:5003/users/${user.id}/resume`,
+        { resume_path: filePath }
+      );
+      console.log('Resume path saved:', response.data);
+    } catch (err) {
+      console.error('Error saving resume path:', err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let estimatedYearsOfExperience = '';
     let suggestedJobTitles: string[] = [];
+    let jobTitleReasons: string[] = [];
 
     if (resume) {
       const formData = new FormData();
@@ -160,9 +179,9 @@ export default function Home() {
         const experienceData = experienceResponse.data as { estimated_years: number };
         estimatedYearsOfExperience = experienceData.estimated_years.toString();
 
-        // Call the API to get suggested job titles
-        const titlesResponse = await axios.post(
-          'http://127.0.0.1:5001/suggest-job-titles',
+        // Call the API to get suggested job titles with reasons
+        const titlesWithReasonsResponse = await axios.post(
+          'http://127.0.0.1:5001/suggest-job-titles-with-reasons',
           formData,
           {
             headers: {
@@ -170,9 +189,21 @@ export default function Home() {
             },
           }
         );
-        console.log('Suggested Job Titles Response:', titlesResponse.data);
-        const titlesData = titlesResponse.data as { suggested_job_titles: string[] };
-        suggestedJobTitles = titlesData.suggested_job_titles || [];
+        console.log('Suggested Job Titles with Reasons Response:', titlesWithReasonsResponse.data);
+        const titlesWithReasonsData = titlesWithReasonsResponse.data as { suggestions_with_reasons: string[] };
+
+        // Parse the response into titles and reasons
+        titlesWithReasonsData.suggestions_with_reasons.forEach((line) => {
+          const [title, explanation] = line.split(':').map((part) => part.trim());
+          if (title && explanation) {
+            suggestedJobTitles.push(title);
+            jobTitleReasons.push(explanation);
+          }
+        });
+
+        // Store suggested job titles and reasons in cookies
+        Cookies.set('suggestedJobTitles', JSON.stringify(suggestedJobTitles));
+        Cookies.set('jobTitleReasons', JSON.stringify(jobTitleReasons));
       } catch (err: any) {
         console.error('Error processing resume:', err);
         setError(
@@ -190,9 +221,7 @@ export default function Home() {
     router.push(
       `/results?jobTitle=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(
         selectedLocation?.name || ''
-      )}&yearsOfExperience=${encodeURIComponent(
-        estimatedYearsOfExperience
-      )}&suggestedJobTitles=${encodeURIComponent(JSON.stringify(suggestedJobTitles))}`
+      )}&yearsOfExperience=${encodeURIComponent(estimatedYearsOfExperience)}`
     );
   };
 
@@ -201,6 +230,11 @@ export default function Home() {
     if (file && file.type === 'application/pdf') {
       setResume(file);
       saveResume(file);
+
+      // Save the file path to the backend
+      const filePath = `/uploads/${file.name}`; // Example file path
+      saveResumePath(filePath);
+
       setError(null);
     } else {
       alert('Please upload a valid PDF file.');
@@ -244,13 +278,13 @@ export default function Home() {
           <label className="flex flex-col">
             <span className="font-medium">Location</span>
             <LocationSearchBox
-              onSelect={(loc) =>
+              onSelect={(loc) => {
                 setSelectedLocation({
                   name: loc.name || 'Unknown',
                   lat: loc.lat,
                   lon: loc.lon,
-                })
-              }
+                });
+              }}
             />
           </label>
           <label className="flex flex-col">

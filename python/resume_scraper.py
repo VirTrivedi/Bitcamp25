@@ -96,6 +96,63 @@ def suggest_job_titles(resume_text):
         logging.error(f"Error generating job title suggestions: {e}")
         raise
 
+def get_reasons_for_job_titles(resume_text, job_titles):
+    try:
+        prompt = f"""
+        Based on the following resume, provide a 1-2 sentence explanation for why the candidate should consider each of the following job titles. 
+        Use bullet points and keep the explanations concise.
+
+        Resume:
+        \"\"\"
+        {resume_text}
+        \"\"\"
+
+        Job Titles:
+        {', '.join(job_titles)}
+        """
+
+        response = client.chat.completions.create(
+            model='gpt-3.5-turbo',
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+
+        reasons = response.choices[0].message.content.strip()
+        return reasons.split('\n')
+    except Exception as e:
+        logging.error(f"Error generating reasons for job titles: {e}")
+        raise
+
+def suggest_job_titles_with_reasons(resume_text):
+    try:
+        prompt = f"""
+        Based on the following resume, suggest 5 job titles that best match the candidate's skills and experience. 
+        For each job title, provide a 1-2 sentence explanation for why the candidate should consider it.
+        Use the following format:
+        - Job Title: Explanation
+
+        Resume:
+        \"\"\"
+        {resume_text}
+        \"\"\"
+        """
+
+        response = client.chat.completions.create(
+            model='gpt-3.5-turbo',
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+
+        suggestions = response.choices[0].message.content.strip()
+        return suggestions.split('\n')
+    except Exception as e:
+        logging.error(f"Error generating job titles with reasons: {e}")
+        raise
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
@@ -145,6 +202,61 @@ def suggest_job_titles_route():
         return jsonify({"suggested_job_titles": job_titles})
     except Exception as e:
         logging.error(f"Error in /suggest-job-titles: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@app.route('/reasons-for-job-titles', methods=['POST'])
+def reasons_for_job_titles_route():
+    if 'file' not in request.files or 'job_titles' not in request.form:
+        return jsonify({"error": "Missing file or job_titles"}), 400
+
+    file = request.files['file']
+    job_titles = request.form['job_titles']
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    temp_path = "temp_resume.pdf"
+    file.save(temp_path)
+
+    try:
+        logging.info(f"Processing file: {file.filename} for reasons for job titles")
+        resume_text = extract_text_from_pdf(temp_path)
+        job_titles_list = [title.strip() for title in job_titles.split(',')]
+        reasons = get_reasons_for_job_titles(resume_text, job_titles_list)
+        return jsonify({"reasons": reasons})
+    except Exception as e:
+        logging.error(f"Error in /reasons-for-job-titles: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@app.route('/suggest-job-titles-with-reasons', methods=['POST'])
+def suggest_job_titles_with_reasons_route():
+    if 'file' not in request.files:
+        logging.error("Missing file in the request.")
+        return jsonify({"error": "Missing file"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        logging.error("No file selected.")
+        return jsonify({"error": "No file selected"}), 400
+
+    logging.info(f"Processing file: {file.filename} for job titles with reasons")
+
+    temp_path = "temp_resume.pdf"
+    file.save(temp_path)
+
+    try:
+        resume_text = extract_text_from_pdf(temp_path)
+        suggestions_with_reasons = suggest_job_titles_with_reasons(resume_text)
+        return jsonify({"suggestions_with_reasons": suggestions_with_reasons})
+    except Exception as e:
+        logging.error(f"Error in /suggest-job-titles-with-reasons: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):

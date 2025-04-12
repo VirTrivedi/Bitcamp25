@@ -17,6 +17,7 @@ class User:
         self.username = username
         self.password = password
         self.recentSearchList = deque(maxlen=5)
+        self.resume_path = None
 
 class RecentSearch:
     def __init__(self, jobTitle: str, location: str, med_salary: str, url: str = None):
@@ -177,6 +178,31 @@ def update_recent_search_url(user_id):
         return jsonify({"message": "Recent search url updated", "recent_search": user["rs1"]})
 
     return jsonify({"error": "No recent searches found"}), 404
+
+@app.route("/users/<int:user_id>/resume", methods=["GET"])
+def get_resume_path(user_id):
+    user = collection.find_one({"_id": user_id})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    resume_path = user.get("resume_path")
+    if not resume_path:
+        return jsonify({"error": "Resume path not set"}), 404
+
+    return jsonify({"resume_path": resume_path})
+
+@app.route("/users/<int:user_id>/resume", methods=["PUT"])
+def update_resume_path(user_id):
+    data = request.json
+    if "resume_path" not in data:
+        return jsonify({"error": "Missing resume_path"}), 400
+
+    user = collection.find_one({"_id": user_id})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    collection.update_one({"_id": user_id}, {"$set": {"resume_path": data["resume_path"]}})
+    return jsonify({"message": "Resume path updated", "resume_path": data["resume_path"]})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5003)

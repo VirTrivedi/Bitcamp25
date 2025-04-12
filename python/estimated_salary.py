@@ -40,7 +40,7 @@ def get_estimated_salary():
     conn = http.client.HTTPSConnection("jsearch.p.rapidapi.com")
 
     headers = {
-        'x-rapidapi-key': "a0244a2f8bmshc3d892fbb75cd60p1243f0jsn5542a55d2e95",
+        'x-rapidapi-key': "f57d15d611msh794a720ffa9343cp1aa093jsn1e7ef38d2c9a",
         'x-rapidapi-host': "jsearch.p.rapidapi.com"
     }
 

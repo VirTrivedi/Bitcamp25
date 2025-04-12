@@ -47,7 +47,7 @@ export const LocationSearchBox: React.FC<LocationSearchBoxProps> = ({
           'Accept-Language': 'en',
         },
       });
-      setResults(res.data);
+      setResults(res.data as LocationResult[]);
     } catch (error) {
       console.error('Error fetching location data:', error);
     } finally {

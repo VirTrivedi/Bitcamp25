@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
@@ -11,22 +11,33 @@ export default function Results() {
   const jobTitle = searchParams.get('jobTitle') || '';
   const location = searchParams.get('location') || '';
   const yearsOfExperience = searchParams.get('yearsOfExperience') || '';
-  const suggestedJobTitlesParam = searchParams.get('suggestedJobTitles') || '[]';
 
   const [salaryData, setSalaryData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [suggestedJobTitles, setSuggestedJobTitles] = useState<string[]>(() => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true); // Ensure client-only logic runs after hydration
+  }, []);
+
+  const [suggestedJobTitles, setSuggestedJobTitles] = useState<string[]>([]);
+  const [jobTitleReasons, setJobTitleReasons] = useState<string[]>([]);
+
+  useEffect(() => {
     try {
-      return JSON.parse(suggestedJobTitlesParam);
+      setSuggestedJobTitles(JSON.parse(Cookies.get('suggestedJobTitles') || '[]'));
+      setJobTitleReasons(JSON.parse(Cookies.get('jobTitleReasons') || '[]'));
     } catch {
-      return [];
+      setSuggestedJobTitles([]);
+      setJobTitleReasons([]);
     }
-  });
+  }, []);
 
   const [minSalary, setMinSalary] = useState<string | null>(null);
   const [maxSalary, setMaxSalary] = useState<string | null>(null);
   const [salaryCurrency, setSalaryCurrency] = useState<string | null>(null);
   const [jobResults, setJobResults] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // State to track loading status
 
   const router = useRouter();
 
@@ -75,9 +86,8 @@ export default function Results() {
         setSalaryData(null);
       }
     };
-
     fetchSalaryData();
-  }, [jobTitle, location, yearsOfExperience]);
+  }, [jobTitle, location, yearsOfExperience, suggestedJobTitles]);
 
   interface Job {
     job_id: string;
@@ -100,6 +110,7 @@ export default function Results() {
   }
 
   const fetchJobResults = async () => {
+    setIsLoading(true); // Show loading bar
     const query = `${jobTitle} in ${location}`;
     interface JobResultsResponse {
       jobs: string; // Stringified JSON containing job data
@@ -115,6 +126,8 @@ export default function Results() {
     } catch (err) {
       console.error('Error fetching job results:', err);
       setJobResults('[]'); // Set to an empty array as a JSON string
+    } finally {
+      setIsLoading(false); // Hide loading bar
     }
   };
   
@@ -167,13 +180,14 @@ export default function Results() {
   const updateMedianSalaryInDatabase = async (medianSalary: string) => {
     const userCookie = Cookies.get('user');
     if (!userCookie) {
-      console.error('User not logged in');
+      console.error('User not logged in. No cookie found.');
       return;
     }
 
     let parsedUser;
     try {
       parsedUser = JSON.parse(userCookie);
+      console.log('Parsed user from cookie:', parsedUser); // Log parsed user
     } catch (err) {
       console.error('Failed to parse user from cookies:', err);
       return;
@@ -184,28 +198,39 @@ export default function Results() {
       return;
     }
 
+    if (!medianSalary || medianSalary === 'N/A') {
+      console.error('Invalid median salary:', medianSalary);
+      return;
+    }
+
     try {
-      const formattedSalary = formatSalaryWithCurrency(medianSalary, salaryCurrency); // Format the median salary
+      const formattedSalary = formatSalaryWithCurrency(medianSalary, salaryCurrency || 'USD'); // Add fallback for currency
+      console.log('Formatted median salary:', formattedSalary); // Log the formatted salary
+
+      const payload = { med_salary: formattedSalary };
+      console.log('Payload being sent to API:', payload); // Log the payload
+
       const response = await axios.put(
         `http://127.0.0.1:5003/users/${parsedUser.id}/recent/med_salary`,
-        { med_salary: formattedSalary } // Use the formatted salary
+        payload
       );
       console.log('Median salary updated in database:', response.data);
     } catch (err) {
-      console.error('Error updating median salary in database:', err);
+      console.error('Error updating median salary in database:', err || err); // Log full error
     }
   };
 
   const updateUrlInDatabase = async (url: string) => {
     const userCookie = Cookies.get('user');
     if (!userCookie) {
-      console.error('User not logged in');
+      console.error('User not logged in. No cookie found.');
       return;
     }
 
     let parsedUser;
     try {
       parsedUser = JSON.parse(userCookie);
+      console.log('Parsed user from cookie:', parsedUser); // Log parsed user
     } catch (err) {
       console.error('Failed to parse user from cookies:', err);
       return;
@@ -217,22 +242,57 @@ export default function Results() {
     }
 
     try {
+      console.log('Updating URL in database:', url); // Log the URL being updated
       const response = await axios.put(
         `http://127.0.0.1:5003/users/${parsedUser.id}/recent/url`,
         { url }
       );
       console.log('URL updated in database:', response.data);
     } catch (err) {
-      console.error('Error updating URL in database:', err);
+      console.error('Error updating URL in database:', err || err); // Log full error
     }
   };
 
   const handleGoBack = () => {
+    if (!isClient) return; // Ensure this runs only on the client
     const medianSalary = salaryData || '';
     const currentUrl = window.location.href; // Get the current website's URL
     updateMedianSalaryInDatabase(medianSalary); // Update the database with the median salary
     updateUrlInDatabase(currentUrl); // Update the database with the current URL
     router.push('/'); // Navigate back to the home page
+  };
+
+  const fetchJobTitleReasons = async () => {
+    if (suggestedJobTitles.length === 0) {
+      console.error('No suggested job titles available to fetch reasons.');
+      return;
+    }
+  
+    try {
+      const formData = new FormData();
+      formData.append('job_titles', suggestedJobTitles.join(',')); // Ensure job_titles is a comma-separated string
+  
+      console.log('Sending job titles to server:', suggestedJobTitles); // Log the job titles being sent
+  
+      const response = await axios.post('http://127.0.0.1:5001/reasons-for-job-titles', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+  
+      console.log('Job Title Reasons Response:', response.data); // Log the response data
+      const data = response.data as { reasons: string[] }; // Explicitly type response.data
+      setJobTitleReasons(data.reasons || []);
+    } catch (err: any) {
+      console.error('Error fetching job title reasons:', err.response?.data || err.message);
+      setJobTitleReasons([]);
+    }
+  };
+
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === 'left' ? -300 : 300; // Adjust scroll amount as needed
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -267,14 +327,24 @@ export default function Results() {
         )}
         <div className="mt-4">
           <strong>Suggested Job Titles:</strong>
-          {suggestedJobTitles.length > 0 ? (
-            <ul className="list-disc list-inside">
+          {isClient && suggestedJobTitles.length > 0 ? (
+            <ul className="list-none pl-0">
               {suggestedJobTitles.map((title, index) => (
                 <li key={index}>{capitalize(title)}</li>
               ))}
             </ul>
           ) : (
             <p>No suggested job titles available.</p>
+          )}
+          {jobTitleReasons.length > 0 && (
+            <div className="mt-4">
+              <strong>Reasons for Suggested Job Titles:</strong>
+              <ul className="list-disc list-inside">
+                {jobTitleReasons.map((reason, index) => (
+                  <li key={index}>{reason}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
         <button
@@ -289,36 +359,60 @@ export default function Results() {
         >
           Fetch Job Results
         </button>
+        {isLoading && (
+          <div className="mt-4 w-full bg-gray-200 rounded-full h-2.5">
+            <div className="bg-blue-600 h-2.5 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+          </div>
+        )}
         {jobResults && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(() => {
-              try {
-                const jobs: Job[] = JSON.parse(jobResults); // Parse the `jobResults` JSON string
-                if (Array.isArray(jobs) && jobs.length > 0) {
-                  return jobs.map((job, index) => (
-                    <div
-                      key={index}
-                      className="text-white shadow-md rounded p-4 flex flex-col justify-between h-64 w-64 border border-white"
-                    >
-                      <p><strong>Job Title:</strong> {job.job_title || 'N/A'}</p>
-                      <p><strong>Employer:</strong> {job.employer_name || 'N/A'}</p>
-                      <p><strong>Location:</strong> {job.job_location || 'N/A'}</p>
-                      <p><strong>Posted:</strong> {job.job_posted_at || 'N/A'}</p>
-                      <p><strong>Job Link:</strong> {job.job_google_link ? (
-                        <a href={job.job_google_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          View Job
-                        </a>
-                      ) : 'N/A'}</p>
-                    </div>
-                  ));
-                } else {
-                  return <p>No job results found.</p>;
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => scrollCarousel('left')}
+                className="rounded-full bg-gray-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-gray-700"
+              >
+                ◀
+              </button>
+              <button
+                onClick={() => scrollCarousel('right')}
+                className="rounded-full bg-gray-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-gray-700"
+              >
+                ▶
+              </button>
+            </div>
+            <div
+              ref={carouselRef}
+              className="flex overflow-x-auto space-x-4 scrollbar-hide"
+            >
+              {(() => {
+                try {
+                  const jobs: Job[] = JSON.parse(jobResults); // Parse the `jobResults` JSON string
+                  if (Array.isArray(jobs) && jobs.length > 0) {
+                    return jobs.map((job, index) => (
+                      <div
+                        key={index}
+                        className="text-white shadow-md rounded p-4 flex flex-col justify-between h-64 w-64 border border-white flex-shrink-0"
+                      >
+                        <p><strong>Job Title:</strong> {job.job_title || 'N/A'}</p>
+                        <p><strong>Employer:</strong> {job.employer_name || 'N/A'}</p>
+                        <p><strong>Location:</strong> {job.job_location || 'N/A'}</p>
+                        <p><strong>Posted:</strong> {job.job_posted_at || 'N/A'}</p>
+                        <p><strong>Job Link:</strong> {job.job_google_link ? (
+                          <a href={job.job_google_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            View Job
+                          </a>
+                        ) : 'N/A'}</p>
+                      </div>
+                    ));
+                  } else {
+                    return <p>No job results found.</p>;
+                  }
+                } catch (err) {
+                  console.error('Error parsing job results:', err);
+                  return <p>Failed to parse job results.</p>;
                 }
-              } catch (err) {
-                console.error('Error parsing job results:', err);
-                return <p>Failed to parse job results.</p>;
-              }
-            })()}
+              })()}
+            </div>
           </div>
         )}
       </div>
