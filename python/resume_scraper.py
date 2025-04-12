@@ -70,6 +70,32 @@ def estimate_experience_years(resume_text, job_title):
         logging.error(f"Error estimating experience years: {e}")
         raise
 
+def suggest_job_titles(resume_text):
+    try:
+        prompt = f"""
+        Based on the following resume, suggest 5 job titles that best match the candidate's skills and experience. 
+        Provide only the job titles as a comma-separated list.
+
+        Resume:
+        \"\"\"
+        {resume_text}
+        \"\"\"
+        """
+
+        response = client.chat.completions.create(
+            model='gpt-3.5-turbo',
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+
+        suggested_titles = response.choices[0].message.content.strip()
+        return [title.strip() for title in suggested_titles.split(',')]
+    except Exception as e:
+        logging.error(f"Error generating job title suggestions: {e}")
+        raise
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
@@ -94,6 +120,31 @@ def estimate_experience():
         return jsonify({"job_title": job_title, "estimated_years": years})
     except Exception as e:
         logging.error(f"Error in /estimate-experience: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+@app.route('/suggest-job-titles', methods=['POST'])
+def suggest_job_titles_route():
+    if 'file' not in request.files:
+        return jsonify({"error": "Missing file"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    temp_path = "temp_resume.pdf"
+    file.save(temp_path)
+
+    try:
+        logging.info(f"Processing file: {file.filename} for job title suggestions")
+        resume_text = extract_text_from_pdf(temp_path)
+        job_titles = suggest_job_titles(resume_text)
+        return jsonify({"suggested_job_titles": job_titles})
+    except Exception as e:
+        logging.error(f"Error in /suggest-job-titles: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):

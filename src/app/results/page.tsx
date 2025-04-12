@@ -3,15 +3,26 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
+import { useRouter } from 'next/navigation';
 
 export default function Results() {
   const searchParams = useSearchParams();
   const jobTitle = searchParams.get('jobTitle') || '';
   const location = searchParams.get('location') || '';
   const yearsOfExperience = searchParams.get('yearsOfExperience') || '';
+  const suggestedJobTitlesParam = searchParams.get('suggestedJobTitles') || '[]';
 
   const [salaryData, setSalaryData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestedJobTitles, setSuggestedJobTitles] = useState<string[]>(() => {
+    try {
+      return JSON.parse(suggestedJobTitlesParam);
+    } catch {
+      return [];
+    }
+  });
+
+  const router = useRouter();
 
   useEffect(() => {
     const fetchSalaryData = async () => {
@@ -35,7 +46,7 @@ export default function Results() {
           setError('No salary data available for the given parameters.');
           setSalaryData(null);
         } else {
-          setSalaryData(response.data); // Set the salary data
+          setSalaryData(JSON.stringify(response.data)); // Convert response data to string
           setError(null);
         }
       } catch (err: any) {
@@ -55,6 +66,13 @@ export default function Results() {
 
     fetchSalaryData();
   }, [jobTitle, location, yearsOfExperience]);
+
+  const capitalize = (text: string) => {
+    return text
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
@@ -79,6 +97,24 @@ export default function Results() {
             {salaryData ? salaryData : 'Loading...'}
           </p>
         )}
+        <div className="mt-4">
+          <strong>Suggested Job Titles:</strong>
+          {suggestedJobTitles.length > 0 ? (
+            <ul className="list-disc list-inside">
+              {suggestedJobTitles.map((title, index) => (
+                <li key={index}>{capitalize(title)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>No suggested job titles available.</p>
+          )}
+        </div>
+        <button
+          onClick={() => router.push('/')}
+          className="mt-6 rounded-full bg-blue-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
+        >
+          Go Back to Home
+        </button>
       </div>
     </div>
   );

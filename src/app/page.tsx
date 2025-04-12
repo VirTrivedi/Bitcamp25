@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { LocationSearchBox } from './components/LocationSearchBox';
@@ -15,11 +15,52 @@ export default function Home() {
   const [resume, setResume] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const [recentSearches, setRecentSearches] = useState<
+    { jobTitle: string; location: string }[]
+  >([]);
+
+  // Load saved resume and recent searches on the client
+  useEffect(() => {
+    const savedResume = localStorage.getItem('savedResume');
+    if (savedResume) {
+      const byteString = atob(savedResume.split(',')[1]);
+      const mimeString = savedResume.split(',')[0].split(':')[1].split(';')[0];
+      const arrayBuffer = new ArrayBuffer(byteString.length);
+      const uintArray = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < byteString.length; i++) {
+        uintArray[i] = byteString.charCodeAt(i);
+      }
+      setResume(new File([arrayBuffer], 'resume.pdf', { type: mimeString }));
+    }
+
+    const savedSearches = localStorage.getItem('recentSearches');
+    if (savedSearches) {
+      setRecentSearches(JSON.parse(savedSearches));
+    }
+  }, []);
+
+  const saveSearch = (jobTitle: string, location: string) => {
+    const newSearch = { jobTitle, location };
+    const updatedSearches = [newSearch, ...recentSearches].slice(0, 5); // Keep only the last 5 searches
+    setRecentSearches(updatedSearches);
+    localStorage.setItem('recentSearches', JSON.stringify(updatedSearches));
+  };
+
+  const saveResume = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result) {
+        localStorage.setItem('savedResume', reader.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let estimatedYearsOfExperience = '';
+    let suggestedJobTitles: string[] = [];
 
     if (resume) {
       const formData = new FormData();
@@ -27,7 +68,8 @@ export default function Home() {
       formData.append('job_title', jobTitle);
 
       try {
-        const response = await axios.post(
+        // Call the API to estimate experience
+        const experienceResponse = await axios.post(
           'http://127.0.0.1:5001/estimate-experience',
           formData,
           {
@@ -36,23 +78,43 @@ export default function Home() {
             },
           }
         );
-        console.log('Experience Response:', response.data);
-        estimatedYearsOfExperience = response.data.estimated_years.toString();
+        console.log('Experience Response:', experienceResponse.data);
+        const experienceData = experienceResponse.data as { estimated_years: number };
+        estimatedYearsOfExperience = experienceData.estimated_years.toString();
+
+        // Call the API to get suggested job titles
+        const titlesResponse = await axios.post(
+          'http://127.0.0.1:5001/suggest-job-titles',
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+        console.log('Suggested Job Titles Response:', titlesResponse.data);
+        const titlesData = titlesResponse.data as { suggested_job_titles: string[] };
+        suggestedJobTitles = titlesData.suggested_job_titles || [];
       } catch (err: any) {
-        console.error('Error estimating experience:', err);
+        console.error('Error processing resume:', err);
         setError(
           err.response?.data?.message ||
-            `Failed to estimate experience. Status: ${err.response?.status || 'Unknown'}`
+            `Failed to process resume. Status: ${err.response?.status || 'Unknown'}`
         );
         return;
       }
     }
 
+    // Save the search
+    saveSearch(jobTitle, selectedLocation?.name || '');
+
     // Navigate to the results page with query parameters
     router.push(
       `/results?jobTitle=${encodeURIComponent(jobTitle)}&location=${encodeURIComponent(
         selectedLocation?.name || ''
-      )}&yearsOfExperience=${encodeURIComponent(estimatedYearsOfExperience)}`
+      )}&yearsOfExperience=${encodeURIComponent(
+        estimatedYearsOfExperience
+      )}&suggestedJobTitles=${encodeURIComponent(JSON.stringify(suggestedJobTitles))}`
     );
   };
 
@@ -60,11 +122,19 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (file && file.type === 'application/pdf') {
       setResume(file);
+      saveResume(file);
       setError(null);
     } else {
       alert('Please upload a valid PDF file.');
       setResume(null);
     }
+  };
+
+  const capitalize = (text: string) => {
+    return text
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   return (
@@ -104,6 +174,11 @@ export default function Home() {
               className="border border-gray-300 rounded px-3 py-2"
               onChange={handleFileChange}
             />
+            {resume && (
+              <p className="text-sm text-gray-600 mt-2">
+                Selected File: <strong>{resume.name}</strong>
+              </p>
+            )}
           </label>
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
@@ -113,6 +188,21 @@ export default function Home() {
             Find Salary Range
           </button>
         </form>
+        <div className="mt-8 w-full max-w-md">
+          <h2 className="text-lg font-semibold mb-2">Recent Searches</h2>
+          {recentSearches.length > 0 ? (
+            <ul className="list-disc list-inside">
+              {recentSearches.map((search, index) => (
+                <li key={index}>
+                  <strong>Job Title:</strong> {capitalize(search.jobTitle)}, <strong>Location:</strong>{' '}
+                  {search.location}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No recent searches.</p>
+          )}
+        </div>
       </main>
     </div>
   );
