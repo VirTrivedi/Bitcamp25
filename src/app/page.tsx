@@ -23,6 +23,12 @@ export default function Home() {
 
   // Load saved resume and recent searches on the client
   useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const savedResume = localStorage.getItem('savedResume');
     if (savedResume) {
       const byteString = atob(savedResume.split(',')[1]);
@@ -44,7 +50,7 @@ export default function Home() {
     if (storedMedianSalary) {
       localStorage.removeItem('medianSalary'); // Clear it after retrieval
     }
-  }, []);
+  }, [router]);
 
   const saveSearch = (jobTitle: string, location: string) => {
     const newSearch = {
