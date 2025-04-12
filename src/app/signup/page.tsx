@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function Signup() {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -17,17 +16,41 @@ export default function Signup() {
     }
   }, []);
 
+  // Utility function to generate a hash code for a string
+  function generateHashCode(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0; // Convert to 32-bit integer
+    }
+    return Math.abs(hash); // Ensure positive value
+  }
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     try {
-      // Simulate signup API call
-      if (name && email && password) {
-        localStorage.setItem('user', JSON.stringify({ name, email }));
+      const response = await fetch('http://localhost:5003/users/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: generateHashCode(email),
+          username: email,
+          password: password,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('user', JSON.stringify({ name: data.user.username }));
         router.push('/login');
       } else {
-        setError('All fields are required.');
+        const errorData = await response.json();
+        setError(errorData.error || 'An error occurred during signup.');
       }
     } catch (err) {
       setError('An error occurred during signup.');
@@ -38,19 +61,6 @@ export default function Signup() {
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
       <h1 className="text-2xl font-bold mb-4">Sign Up</h1>
       <form onSubmit={handleSignup} className="bg-black shadow-md rounded p-6 max-w-md w-full">
-        <div className="mb-4">
-          <label htmlFor="name" className="block text-sm font-medium mb-2">
-            Name
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
         <div className="mb-4">
           <label htmlFor="email" className="block text-sm font-medium mb-2">
             Email

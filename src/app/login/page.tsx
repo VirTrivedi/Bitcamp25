@@ -21,10 +21,20 @@ export default function Login() {
     setError(null);
 
     try {
-      // Simulate login API call
-      if (email === 'test@example.com' && password === 'password') {
-        localStorage.setItem('user', JSON.stringify({ email }));
-        router.push('/');
+      const userId = generateHashCode(email);
+      const usernameResponse = await fetch(`http://localhost:5003/users/${userId}/username`);
+      const passwordResponse = await fetch(`http://localhost:5003/users/${userId}/password`);
+      
+      if (usernameResponse.ok && passwordResponse.ok) {
+        const username = await usernameResponse.text();
+        const storedPassword = await passwordResponse.text();
+
+        if (username === email && storedPassword === password) {
+          localStorage.setItem('user', JSON.stringify({ email: username }));
+          router.push('/');
+        } else {
+          setError('Invalid email or password.');
+        }
       } else {
         setError('Invalid email or password.');
       }
@@ -33,6 +43,17 @@ export default function Login() {
     }
   };
 
+  // Utility function to generate a hash code for a string
+  function generateHashCode(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0; // Convert to 32-bit integer
+    }
+    return Math.abs(hash); // Ensure positive value
+  }
+  
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
       <h1 className="text-2xl font-bold mb-4">Login</h1>
