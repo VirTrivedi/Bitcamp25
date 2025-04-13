@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Cookies from 'js-cookie';
 
 export default function Login() {
@@ -10,10 +10,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Add loading state
   const router = useRouter();
+  const pathname = usePathname(); // Get the current path
 
   useEffect(() => {
     const userCookie = Cookies.get('user');
-    if (userCookie) {
+    if (userCookie && pathname === '/login') { // Only redirect if on the login page
       try {
         const parsedUser = JSON.parse(userCookie);
         if (parsedUser && parsedUser.id) {
@@ -25,7 +26,7 @@ export default function Login() {
       }
     }
     setIsLoading(false); // Set loading to false if no valid user
-  }, [router]);
+  }, [router, pathname]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -11,11 +11,18 @@ export default function Signup() {
   const router = useRouter();
 
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      router.push('/'); // Redirect to home if already logged in
+    const userCookie = Cookies.get('user'); // Check for user in cookies
+    if (userCookie) {
+      try {
+        const parsedUser = JSON.parse(userCookie);
+        if (parsedUser && parsedUser.id) {
+          router.push('/'); // Redirect to home if valid user exists
+        }
+      } catch (err) {
+        console.error('Failed to parse user from cookies:', err);
+      }
     }
-  }, []);
+  }, [router]);
 
   // Utility function to generate a hash code for a string
   function generateHashCode(str: string): number {

@@ -330,7 +330,14 @@ export default function Results() {
           {isClient && suggestedJobTitles.length > 0 ? (
             <ul className="list-none pl-0">
               {suggestedJobTitles.map((title, index) => (
-                <li key={index}>{capitalize(title)}</li>
+                <li key={index}>
+                  <a
+                    href={`/results?jobTitle=${encodeURIComponent(title)}&location=${encodeURIComponent(location)}&yearsOfExperience=${encodeURIComponent(yearsOfExperience)}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {capitalize(title)}
+                  </a>
+                </li>
               ))}
             </ul>
           ) : (
