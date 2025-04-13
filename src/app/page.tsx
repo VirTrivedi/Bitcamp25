@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { LocationSearchBox } from './components/LocationSearchBox';
+import { LocationSearchBox } from '../components/LocationSearchBox';
 import Cookies from 'js-cookie';
 
 export default function Home() {
@@ -259,59 +259,82 @@ export default function Home() {
   }
 
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <h1 className="text-2xl font-bold text-center sm:text-left">
-          Find Your Salary Range
-        </h1>
-        <form className="flex flex-col gap-4 w-full max-w-md" onSubmit={handleSubmit}>
-          <label className="flex flex-col">
-            <span className="font-medium">Job Title</span>
-            <input
-              type="text"
-              placeholder="e.g., Software Engineer"
-              className="border border-gray-300 rounded px-3 py-2"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="font-medium">Location</span>
-            <LocationSearchBox
-              onSelect={(loc) => {
-                setSelectedLocation({
-                  name: loc.name || 'Unknown',
-                  lat: loc.lat,
-                  lon: loc.lon,
-                });
-              }}
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="font-medium">Upload Resume (PDF)</span>
-            <input
-              type="file"
-              accept="application/pdf"
-              className="border border-gray-300 rounded px-3 py-2"
-              onChange={handleFileChange}
-            />
-          </label>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button
-            type="submit"
-            className="rounded-full bg-blue-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
-          >
-            Find Salary Range
-          </button>
-        </form>
-        <div className="mt-8 w-full max-w-md">
-          <h2 className="text-lg font-semibold mb-2">Recent Searches</h2>
+    <div
+      className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]"
+      style={{
+        backgroundImage: "url('/Home Page Background.png')",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Top bar */}
+      <div className="w-full py-4 px-8 flex justify-between items-center" style={{ marginLeft: '200%' }}>
+        <a
+          href="#"
+          onClick={handleSignOut}
+          className="text-black text-sm underline"
+        >
+          Sign Out
+        </a>
+      </div>
+
+      <main className="flex flex-row gap-16 w-full max-w-6xl justify-center">
+        {/* Left side: Inputs */}
+        <div className="flex flex-col gap-8 flex-1 max-w-md bg-black text-white p-6 rounded-lg shadow-lg">
+          <h1 className="text-2xl font-bold text-left">Find Your Salary Range</h1>
+          <form className="flex flex-col gap-4 w-full" onSubmit={handleSubmit}>
+            <label className="flex flex-col">
+              <span className="font-medium">Job Title</span>
+              <input
+                type="text"
+                placeholder="e.g., Software Engineer"
+                className="border border-gray-300 rounded px-3 py-2 text-black"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col">
+              <span className="font-medium">Location</span>
+              <LocationSearchBox
+                onSelect={(loc) => {
+                  setSelectedLocation({
+                    name: loc.name || 'Unknown',
+                    lat: loc.lat,
+                    lon: loc.lon,
+                  });
+                }}
+              />
+            </label>
+            <label className="flex flex-col">
+              <span className="font-medium">Upload Resume (PDF)</span>
+              <input
+                type="file"
+                accept="application/pdf"
+                className="border border-gray-300 rounded px-3 py-2 text-black"
+                onChange={handleFileChange}
+              />
+            </label>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={!jobTitle || !selectedLocation || !resume} // Disable button if fields are incomplete
+              className="w-full rounded-full bg-black-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
+            >
+              Find Salary Range
+            </button>
+          </form>
+        </div>
+
+        {/* Right side: Recent Searches */}
+        <div className="flex flex-col gap-4 flex-1 max-w-md">
+          <h2 className="text-lg font-semibold text-white">Recent Searches</h2> {/* Updated text color */}
           {recentSearches.length > 0 ? (
-            <ul className="list-disc list-inside">
+            <div className="flex flex-col gap-3">
               {recentSearches.map((search, index) => (
-                <li
+                <div
                   key={index}
-                  className="cursor-pointer text-blue-600 hover:underline"
+                  className="bg-black text-white p-4 rounded-lg cursor-pointer hover:bg-gray-800"
                   onClick={() => {
                     if (search.url) {
                       window.location.href = search.url; // Navigate to the stored URL
@@ -325,21 +348,16 @@ export default function Home() {
                     }
                   }}
                 >
-                  <strong>Job Title:</strong> {capitalize(search.jobTitle)}, <strong>Location:</strong>{' '}
-                  {search.location}, <strong>Median Salary:</strong> {search.medianSalary || 'N/A'}
-                </li>
+                  <p><strong>Job Title:</strong> {capitalize(search.jobTitle)}</p>
+                  <p><strong>Location:</strong> {search.location}</p>
+                  <p><strong>Median Salary:</strong> {search.medianSalary || 'N/A'}</p>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
-            <p>No recent searches.</p>
+            <p className="text-white">No recent searches.</p>
           )}
         </div>
-        <button
-          onClick={handleSignOut}
-          className="mt-6 rounded-full bg-red-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-red-700"
-        >
-          Sign Out
-        </button>
       </main>
     </div>
   );

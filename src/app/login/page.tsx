@@ -71,11 +71,21 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8">
-      <h1 className="text-2xl font-bold mb-4">Login</h1>
-      <form onSubmit={handleLogin} className="bg-black shadow-md rounded p-6 max-w-md w-full">
+    <div
+      className="min-h-screen flex items-center justify-start p-8"
+      style={{
+        backgroundImage: "url('/Login Page Background.png')",
+        backgroundSize: 'contain',
+        backgroundPosition: 'center',
+      }}
+    >
+      <form
+        onSubmit={handleLogin}
+        className="bg-black rounded p-6 max-w-md w-full"
+        style={{ marginLeft: '53%' }}
+      >
         <div className="mb-4">
-          <label htmlFor="email" className="block text-sm font-medium mb-2">
+          <label htmlFor="email" className="block text-sm font-medium mb-2 !text-black">
             Email
           </label>
           <input
@@ -88,7 +98,7 @@ export default function Login() {
           />
         </div>
         <div className="mb-4">
-          <label htmlFor="password" className="block text-sm font-medium mb-2">
+          <label htmlFor="password" className="block text-sm font-medium mb-2 text-black">
             Password
           </label>
           <input
@@ -102,14 +112,14 @@ export default function Login() {
         </div>
         {error && <p className="text-red-600 mb-4">{error}</p>}
         <button
-          type="submit"
-          className="w-full rounded-full bg-blue-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
-        >
-          Login
-        </button>
-        <p className="mt-4 text-sm text-center">
+            type="submit"
+            className="w-full rounded-full bg-black-600 text-white font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 hover:bg-blue-700"
+          >
+            Log In
+          </button>
+        <p className="mt-4 text-sm text-center text-black">
           Don't have an account?{' '}
-          <a href="/signup" className="text-blue-600 hover:underline">
+          <a href="/signup" className="text-blue-600 hover:underline hover:text-blue-800">
             Sign Up
           </a>
         </p>

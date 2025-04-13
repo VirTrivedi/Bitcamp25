@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import http.client
 
+
 app = Flask(__name__)
 CORS(app)
 
@@ -11,7 +12,7 @@ def get_jobs():
     
     conn = http.client.HTTPSConnection("jsearch.p.rapidapi.com")
     headers = {
-        'x-rapidapi-key': "f57d15d611msh794a720ffa9343cp1aa093jsn1e7ef38d2c9a",
+        'x-rapidapi-key': "7aa0141247msh249b26dba048d27p1acdeajsnfffe5b497bc4",
         'x-rapidapi-host': "jsearch.p.rapidapi.com"
     }
     

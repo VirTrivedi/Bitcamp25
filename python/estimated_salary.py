@@ -3,9 +3,11 @@ from flask_cors import CORS  # Import CORS
 import http.client
 import urllib.parse  # Import for URL encoding
 import json  # Import for JSON parsing
+import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
 @app.route('/get-estimated-salary', methods=['GET'])
 def get_estimated_salary():
@@ -40,7 +42,7 @@ def get_estimated_salary():
     conn = http.client.HTTPSConnection("jsearch.p.rapidapi.com")
 
     headers = {
-        'x-rapidapi-key': "f57d15d611msh794a720ffa9343cp1aa093jsn1e7ef38d2c9a",
+        'x-rapidapi-key': "7aa0141247msh249b26dba048d27p1acdeajsnfffe5b497bc4",
         'x-rapidapi-host': "jsearch.p.rapidapi.com"
     }
 
@@ -48,6 +50,9 @@ def get_estimated_salary():
     conn.request("GET", endpoint, headers=headers)
 
     res = conn.getresponse()
+    if res.status != 200:  # Check for non-200 status codes
+        return f"Error: API request failed with status {res.status} - {res.reason}"
+
     data = res.read()
 
     # Parse the JSON response
@@ -71,4 +76,4 @@ def get_estimated_salary():
         return "Error: Invalid JSON response from API"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)  # Bind to all IPs and use port 5000

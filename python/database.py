@@ -3,11 +3,15 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from bson import ObjectId
 from collections import deque
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+client_key = os.getenv("MONGO_CLIENT_KEY")
 app = Flask(__name__)
 CORS(app)
 
-cluster = MongoClient("mongodb+srv://sidk4156:wd8lTyefzJgty3Nb@cluster0.ol8pdzi.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+cluster = MongoClient(client_key)
 db = cluster["jobs"]
 collection = db["username"]
 
